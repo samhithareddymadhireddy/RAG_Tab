@@ -25,7 +25,7 @@ class GeminiTabularClient:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model_name: str = "gemini-3.5-flash",
+        model_name: str = "gemini-3-flash-preview",
         temperature: float = 0.7,
         mock_mode: bool = False
     ):
@@ -44,7 +44,7 @@ class GeminiTabularClient:
             return self._generate_mock_response(prompt)
 
         # Use direct HTTPS REST for maximum stability across Windows and HTTP/2 proxies
-        candidate_models = [self.model_name, "gemini-3.7-flash", "gemini-3.8-flash"]
+        candidate_models = ["gemini-3-flash-preview", "gemini-flash-lite-latest"]
         last_error = None
 
         for model in candidate_models:
@@ -57,7 +57,7 @@ class GeminiTabularClient:
                 }
             }
             try:
-                with httpx.Client(timeout=30.0) as client:
+                with httpx.Client(timeout=60.0) as client:
                     resp = client.post(url, json=payload)
                     if resp.status_code == 200:
                         data = resp.json()
@@ -66,8 +66,9 @@ class GeminiTabularClient:
                             parts = candidates[0].get("content", {}).get("parts", [])
                             if parts:
                                 return parts[0].get("text", "")
-                    elif resp.status_code == 404:
-                        # Model name deprecated or unavailable, try next candidate
+                    elif resp.status_code in (404, 503, 429):
+                        # Model name deprecated, busy, or rate-limited; fall through to next candidate model
+                        last_error = f"HTTP {resp.status_code} on {model}"
                         continue
                     else:
                         last_error = f"HTTP {resp.status_code}: {resp.text}"

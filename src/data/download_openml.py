@@ -5,28 +5,64 @@ import pandas as pd
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 
-# Mapping of Table 9 dataset names to OpenML names/aliases
+# Complete mapping of the 60 datasets from Table 9 (OpenML benchmark suite)
 TABLE_9_DATASETS: Dict[str, Dict[str, Any]] = {
-    "haberman": {"openml_name": "haberman", "target_col": "Survival_status", "minority_val": "2"},
-    "diabetes": {"openml_name": "diabetes", "target_col": "class", "minority_val": "tested_positive"},
+    "mw1": {"openml_name": "mw1", "target_col": "Defective", "minority_val": "Y"},
+    "PizzaCutter1": {"openml_name": "PizzaCutter1", "target_col": "Class", "minority_val": None},
+    "analcatdata_draft": {"openml_name": "analcatdata_draft", "target_col": "Class", "minority_val": None},
+    "PieChart1": {"openml_name": "PieChart1", "target_col": "Class", "minority_val": None},
+    "vowel": {"openml_name": "vowel", "target_col": "Class", "minority_val": None},
+    "meta": {"openml_name": "meta", "target_col": "Class", "minority_val": None},
+    "kc3": {"openml_name": "kc3", "target_col": "problems", "minority_val": "yes"},
+    "analcatdata_halloffame": {"openml_name": "analcatdata_halloffame", "target_col": "Class", "minority_val": None},
+    "mfeat-morphological": {"openml_name": "mfeat-morphological", "target_col": "class", "minority_val": None},
+    "PizzaCutter3": {"openml_name": "PizzaCutter3", "target_col": "Class", "minority_val": None},
+    "analcatdata_apnea3": {"openml_name": "analcatdata_apnea3", "target_col": "Class", "minority_val": None},
+    "analcatdata_apnea1": {"openml_name": "analcatdata_apnea1", "target_col": "Class", "minority_val": None},
+    "CastMetal1": {"openml_name": "CastMetal1", "target_col": "Class", "minority_val": None},
+    "analcatdata_apnea2": {"openml_name": "analcatdata_apnea2", "target_col": "Class", "minority_val": None},
+    "segment": {"openml_name": "segment", "target_col": "class", "minority_val": None},
+    "arsenic-female-bladder": {"openml_name": "arsenic-female-bladder", "target_col": "Class", "minority_val": None},
+    "thoracic-surgery": {"openml_name": "ThoracicSurgery", "target_col": "Risk1Yr", "minority_val": "T"},
+    "water-treatment": {"openml_name": "water-treatment", "target_col": "Class", "minority_val": None},
+    "collins": {"openml_name": "collins", "target_col": "Class", "minority_val": None},
+    "soybean": {"openml_name": "soybean", "target_col": "class", "minority_val": None},
+    "solar-flare": {"openml_name": "solar-flare", "target_col": "class", "minority_val": None},
+    "analcatdata_dmft": {"openml_name": "analcatdata_dmft", "target_col": "Class", "minority_val": None},
+    "kc2": {"openml_name": "kc2", "target_col": "problems", "minority_val": "yes"},
+    "mofn-3-7-10": {"openml_name": "mofn-3-7-10", "target_col": "Class", "minority_val": None},
+    "socmob": {"openml_name": "socmob", "target_col": "Class", "minority_val": None},
+    "analcatdata_germangss": {"openml_name": "analcatdata_germangss", "target_col": "Class", "minority_val": None},
+    "braziltourism": {"openml_name": "braziltourism", "target_col": "Class", "minority_val": None},
     "blood-transfusion-service-center": {"openml_name": "blood-transfusion-service-center", "target_col": "Class", "minority_val": "2"},
+    "primary-tumor": {"openml_name": "primary-tumor", "target_col": "class", "minority_val": None},
+    "vehicle": {"openml_name": "vehicle", "target_col": "Class", "minority_val": None},
+    "autoUniv-au1-1000": {"openml_name": "autoUniv-au1-1000", "target_col": "Class", "minority_val": None},
+    "haberman": {"openml_name": "haberman", "target_col": "Survival_status", "minority_val": "2"},
+    "ilpd": {"openml_name": "ilpd", "target_col": "Class", "minority_val": "2"},
+    "car": {"openml_name": "car", "target_col": "class", "minority_val": None},
     "credit-g": {"openml_name": "credit-g", "target_col": "class", "minority_val": "bad"},
     "dermatology": {"openml_name": "dermatology", "target_col": "class", "minority_val": None},
-    "ionosphere": {"openml_name": "ionosphere", "target_col": "class", "minority_val": "b"},
-    "wdbc": {"openml_name": "wdbc", "target_col": "Class", "minority_val": "2"},
-    "spambase": {"openml_name": "spambase", "target_col": "class", "minority_val": "1"},
-    "segment": {"openml_name": "segment", "target_col": "class", "minority_val": None},
-    "vehicle": {"openml_name": "vehicle", "target_col": "Class", "minority_val": None},
-    "car": {"openml_name": "car", "target_col": "class", "minority_val": None},
-    "kc2": {"openml_name": "kc2", "target_col": "problems", "minority_val": "yes"},
-    "kc3": {"openml_name": "kc3", "target_col": "problems", "minority_val": "yes"},
-    "mw1": {"openml_name": "mw1", "target_col": "Defective", "minority_val": "Y"},
+    "analcatdata_marketing": {"openml_name": "analcatdata_marketing", "target_col": "Class", "minority_val": None},
+    "eucalyptus": {"openml_name": "eucalyptus", "target_col": "Utility", "minority_val": None},
+    "emotions": {"openml_name": "emotions", "target_col": "Class", "minority_val": None},
+    "vertebra-column": {"openml_name": "vertebra-column", "target_col": "class", "minority_val": None},
+    "Titanic": {"openml_name": "titanic", "target_col": "survived", "minority_val": "1"},
+    "colleges_aaup": {"openml_name": "colleges_aaup", "target_col": "Class", "minority_val": None},
+    "xd6": {"openml_name": "xd6", "target_col": "Class", "minority_val": None},
     "pc1_req": {"openml_name": "pc1_req", "target_col": "Defective", "minority_val": "Y"},
-    "tic-tac-toe": {"openml_name": "tic-tac-toe", "target_col": "Class", "minority_val": "negative"},
-    "breast-w": {"openml_name": "breast-w", "target_col": "Class", "minority_val": "malignant"},
-    "sa-heart": {"openml_name": "SAheart", "target_col": "chd", "minority_val": "1"},
     "qsar-biodeg": {"openml_name": "qsar-biodeg", "target_col": "Class", "minority_val": "2"},
-    "vowel": {"openml_name": "vowel", "target_col": "Class", "minority_val": None},
+    "sa-heart": {"openml_name": "SAheart", "target_col": "chd", "minority_val": "1"},
+    "tic-tac-toe": {"openml_name": "tic-tac-toe", "target_col": "Class", "minority_val": "negative"},
+    "diabetes": {"openml_name": "diabetes", "target_col": "class", "minority_val": "tested_positive"},
+    "breast-w": {"openml_name": "breast-w", "target_col": "Class", "minority_val": "malignant"},
+    "ionosphere": {"openml_name": "ionosphere", "target_col": "class", "minority_val": "b"},
+    "tokyo1": {"openml_name": "tokyo1", "target_col": "Class", "minority_val": None},
+    "kdd_el_nino-small": {"openml_name": "kdd_el_nino-small", "target_col": "Class", "minority_val": None},
+    "wdbc": {"openml_name": "wdbc", "target_col": "Class", "minority_val": "2"},
+    "cars": {"openml_name": "cars", "target_col": "class", "minority_val": None},
+    "cylinder-bands": {"openml_name": "cylinder-bands", "target_col": "band_type", "minority_val": "band"},
+    "spambase": {"openml_name": "spambase", "target_col": "class", "minority_val": "1"},
     "sonar": {"openml_name": "sonar", "target_col": "Class", "minority_val": "M"},
     "yeast": {"openml_name": "yeast", "target_col": "class_protein_localization", "minority_val": None},
 }
@@ -65,7 +101,7 @@ def download_dataset(
     if target_col not in df.columns and len(df.columns) > 0:
         target_col = df.columns[-1]
 
-    # Handle missing values
+    # Drop missing values
     df = df.dropna().reset_index(drop=True)
 
     # Encode target into binary minority ('positive') and majority ('negative')
@@ -75,10 +111,8 @@ def download_dataset(
     else:
         minority_label = target_counts.idxmin()
 
-    majority_labels = [c for c in target_counts.index if c != minority_label]
-    
     # Binary mapping: minority -> 'positive', others -> 'negative'
-    binary_y = df[target_col].apply(lambda x: "positive" if x == minority_label else "negative")
+    binary_y = df[target_col].apply(lambda x: "positive" if str(x) == str(minority_label) else "negative")
     df["Class"] = binary_y
 
     feature_cols = [c for c in df.columns if c not in (target_col, "Class")]
