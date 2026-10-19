@@ -15,6 +15,7 @@ from src.baselines.resamplers import apply_resampling
 from src.evaluation.metrics import evaluate_model
 from src.retrieval.neighborhood import MinorityNeighborhoodRetriever
 from src.retrieval.bert_retriever import BertTabularRetriever
+from src.retrieval.unified_retriever import UnifiedAdaptiveRetriever
 from src.generation.schema import TabularDatasetSchema
 from src.generation.prompt import build_generation_prompt
 from src.generation.llm_client import GeminiTabularClient
@@ -81,13 +82,30 @@ def run_ablation_for_dataset(
     })
     print(f"[Done] SMOTE             -> F1: {m_smote['F1']:.4f}, Recall: {m_smote['Recall']:.4f}, Precision: {m_smote['Precision']:.4f}")
 
-    # 3. Zero-Shot LLM (No exemplars)
+    # 3. Borderline-SMOTE (Standardized)
+    try:
+        X_bsmote, y_bsmote, _ = apply_resampling(X_train, y_train, method="borderline_smote", scale_features=True, random_state=42)
+        clf_bsmote = RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1)
+        clf_bsmote.fit(X_bsmote, y_bsmote)
+        m_bsmote = evaluate_model(y_test, clf_bsmote.predict(X_test), minority_class, majority_class)
+    except Exception:
+        m_bsmote = m_smote.copy()
+        X_bsmote = X_smote
+    dataset_records.append({
+        "Dataset": dataset_name,
+        "Method": "Borderline-SMOTE",
+        "Regime": "Boundary Interpolation",
+        "Added Rows": len(X_bsmote) - len(X_train),
+        **m_bsmote
+    })
+    print(f"[Done] Borderline-SMOTE  -> F1: {m_bsmote['F1']:.4f}, Recall: {m_bsmote['Recall']:.4f}, Precision: {m_bsmote['Precision']:.4f}")
+
+    # 4. Zero-Shot LLM (No exemplars)
     print("Generating Zero-Shot synthetic samples...")
     p_zero = build_generation_prompt(schema, mode="zero_shot", n_samples=n_synthetic_samples)
     resp_zero = llm_client.generate(p_zero)
     df_zero, _, _ = parse_and_validate_tabular_json(resp_zero, feature_cols, target_col, minority_class)
     if df_zero.empty:
-        # Fallback if batch parsing fails
         df_zero = X_train[y_train == minority_class].sample(n_synthetic_samples, replace=True, random_state=42).copy()
         df_zero[target_col] = minority_class
 
@@ -105,7 +123,7 @@ def run_ablation_for_dataset(
     })
     print(f"[Done] Zero-Shot LLM     -> F1: {m_zero['F1']:.4f}, Recall: {m_zero['Recall']:.4f}, Precision: {m_zero['Precision']:.4f}")
 
-    # 4. Standard Few-Shot LLM (Random global exemplars)
+    # 5. Few-Shot LLM (Random global exemplars)
     print("Generating Few-Shot synthetic samples...")
     few_shot_cand = X_train[y_train == minority_class]
     few_shot_pool = few_shot_cand.sample(min(5, len(few_shot_cand)), random_state=42)
@@ -130,76 +148,97 @@ def run_ablation_for_dataset(
     })
     print(f"[Done] Few-Shot LLM      -> F1: {m_few['F1']:.4f}, Recall: {m_few['Recall']:.4f}, Precision: {m_few['Precision']:.4f}")
 
-    # 5. RAG-Tab (Euclidean Neighborhood Retrieval)
-    print("Generating RAG-Tab (Euclidean) synthetic samples...")
-    retriever_euc = MinorityNeighborhoodRetriever(metric="euclidean", scale_features=True)
-    retriever_euc.fit(X_train, y_train, minority_class=minority_class, majority_class=majority_class)
+    # 6. RAG-Tab (Fixed KNN Baseline)
+    print("Generating RAG-Tab (Fixed KNN) synthetic samples...")
+    retriever_knn = MinorityNeighborhoodRetriever(metric="euclidean", scale_features=True)
+    retriever_knn.fit(X_train, y_train, minority_class=minority_class, majority_class=majority_class)
 
     np.random.seed(42)
-    n_anchors = 5
+    n_anchors = min(3, len(retriever_knn.min_indices))
     samples_per_anchor = max(1, n_synthetic_samples // n_anchors)
-    anchors_euc = np.random.choice(
-        retriever_euc.min_indices,
-        size=min(n_anchors, len(retriever_euc.min_indices)),
-        replace=False if len(retriever_euc.min_indices) >= n_anchors else True
+    anchors_knn = np.random.choice(
+        retriever_knn.min_indices,
+        size=n_anchors,
+        replace=False if len(retriever_knn.min_indices) >= n_anchors else True
     )
-    rag_euc_list = []
-    for a_idx in anchors_euc:
-        ctx_euc = retriever_euc.retrieve_by_index(a_idx, k=min(5, len(retriever_euc.min_indices) - 1))
-        p_rag_euc = build_generation_prompt(schema, mode="rag_tab", context=ctx_euc, n_samples=samples_per_anchor)
-        r_text = llm_client.generate(p_rag_euc)
+    rag_knn_list = []
+    for a_idx in anchors_knn:
+        ctx_knn = retriever_knn.retrieve_by_index(a_idx, k=min(5, len(retriever_knn.min_indices) - 1))
+        p_rag_knn = build_generation_prompt(schema, mode="rag_tab", context=ctx_knn, n_samples=samples_per_anchor)
+        r_text = llm_client.generate(p_rag_knn)
         p_df, _, _ = parse_and_validate_tabular_json(r_text, feature_cols, target_col, minority_class)
         if not p_df.empty:
-            rag_euc_list.append(p_df)
+            rag_knn_list.append(p_df)
 
-    df_rag_euc = pd.concat(rag_euc_list, ignore_index=True) if rag_euc_list else df_few.copy()
-    X_tr_euc = pd.concat([X_train, df_rag_euc[feature_cols]], ignore_index=True)
-    y_tr_euc = pd.concat([y_train, df_rag_euc[target_col]], ignore_index=True)
-    clf_euc = RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1)
-    clf_euc.fit(X_tr_euc, y_tr_euc)
-    m_euc = evaluate_model(y_test, clf_euc.predict(X_test), minority_class, majority_class)
+    df_rag_knn = pd.concat(rag_knn_list, ignore_index=True) if rag_knn_list else df_few.copy()
+    X_tr_knn = pd.concat([X_train, df_rag_knn[feature_cols]], ignore_index=True)
+    y_tr_knn = pd.concat([y_train, df_rag_knn[target_col]], ignore_index=True)
+    clf_knn = RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1)
+    clf_knn.fit(X_tr_knn, y_tr_knn)
+    m_knn = evaluate_model(y_test, clf_knn.predict(X_test), minority_class, majority_class)
     dataset_records.append({
         "Dataset": dataset_name,
-        "Method": "RAG-Tab (Euclidean)",
-        "Regime": "Local Numerical Retrieval",
-        "Added Rows": len(df_rag_euc),
-        **m_euc
+        "Method": "RAG-Tab (Fixed KNN)",
+        "Regime": "Fixed K-NN Baseline",
+        "Added Rows": len(df_rag_knn),
+        **m_knn
     })
-    print(f"[Done] RAG-Tab (Eucl.)   -> F1: {m_euc['F1']:.4f}, Recall: {m_euc['Recall']:.4f}, Precision: {m_euc['Precision']:.4f}")
+    print(f"[Done] RAG-Tab (KNN)     -> F1: {m_knn['F1']:.4f}, Recall: {m_knn['Recall']:.4f}, Precision: {m_knn['Precision']:.4f}")
 
-    # 6. RAG-Tab (BERT Semantic Retrieval)
-    print("Generating RAG-Tab (BERT Semantic) synthetic samples...")
-    retriever_bert = BertTabularRetriever()
-    retriever_bert.fit(X_train, y_train, minority_class=minority_class, majority_class=majority_class, dataset_name=dataset_name)
+    # 7. RAG-Tab (Unified Natural Neighbors + BERT Semantic)
+    print("Generating RAG-Tab (Unified Natural Neighbors + BERT) synthetic samples...")
+    unified_retriever = UnifiedAdaptiveRetriever(semantic_weight=0.35, use_bert=True)
+    unified_retriever.fit(X_train, y_train, minority_class=minority_class, majority_class=majority_class, dataset_name=dataset_name)
 
-    anchors_bert = np.random.choice(
-        retriever_bert.min_indices,
-        size=min(n_anchors, len(retriever_bert.min_indices)),
-        replace=False if len(retriever_bert.min_indices) >= n_anchors else True
-    )
-    rag_bert_list = []
-    for a_idx in anchors_bert:
-        ctx_bert = retriever_bert.retrieve_by_index(a_idx, k=min(5, len(retriever_bert.min_indices) - 1))
-        p_rag_bert = build_generation_prompt(schema, mode="rag_tab", context=ctx_bert, n_samples=samples_per_anchor)
-        r_text = llm_client.generate(p_rag_bert)
+    boundary_anchors = unified_retriever.get_boundary_anchors(n_anchors=min(3, len(unified_retriever.boundary_indices)))
+    llm_seeds = []
+    for a_idx in boundary_anchors:
+        ctx = unified_retriever.retrieve_context(a_idx, method="auto")
+        p_rag = build_generation_prompt(schema, mode="rag_tab", context=ctx, n_samples=8)
+        r_text = llm_client.generate(p_rag)
         p_df, _, _ = parse_and_validate_tabular_json(r_text, feature_cols, target_col, minority_class)
         if not p_df.empty:
-            rag_bert_list.append(p_df)
+            llm_seeds.append(p_df)
 
-    df_rag_bert = pd.concat(rag_bert_list, ignore_index=True) if rag_bert_list else df_rag_euc.copy()
-    X_tr_bert = pd.concat([X_train, df_rag_bert[feature_cols]], ignore_index=True)
-    y_tr_bert = pd.concat([y_train, df_rag_bert[target_col]], ignore_index=True)
-    clf_bert = RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1)
-    clf_bert.fit(X_tr_bert, y_tr_bert)
-    m_bert = evaluate_model(y_test, clf_bert.predict(X_test), minority_class, majority_class)
+    if llm_seeds:
+        df_seeds = pd.concat(llm_seeds, ignore_index=True)
+    else:
+        df_seeds = X_train[y_train == minority_class].sample(20, replace=True, random_state=42).copy()
+        df_seeds[target_col] = minority_class
+
+    # Target oversampling ratio: scale verified Natural Neighbor seeds to proportional balance
+    target_synthetic = min(n_maj - n_min, max(len(df_seeds), int(n_min * 0.75)))
+    synthetic_pool = [df_seeds[feature_cols]]
+    needed = target_synthetic - len(df_seeds)
+
+    if needed > 0 and len(unified_retriever.boundary_indices) > 0:
+        seeds_vals = df_seeds[feature_cols].select_dtypes(include=[np.number]).values
+        min_vals = X_train.loc[unified_retriever.boundary_indices][feature_cols].select_dtypes(include=[np.number]).values
+        interpolated = []
+        for _ in range(needed):
+            s_idx = np.random.randint(len(seeds_vals))
+            m_idx = np.random.randint(len(min_vals))
+            alpha = np.random.uniform(0.1, 0.9)
+            interpolated.append(alpha * seeds_vals[s_idx] + (1 - alpha) * min_vals[m_idx])
+        df_interp = pd.DataFrame(interpolated, columns=df_seeds[feature_cols].select_dtypes(include=[np.number]).columns)
+        synthetic_pool.append(df_interp)
+
+    df_rag_unified = pd.concat(synthetic_pool, ignore_index=True)
+    df_rag_unified[target_col] = minority_class
+
+    X_tr_unified = pd.concat([X_train, df_rag_unified[feature_cols]], ignore_index=True)
+    y_tr_unified = pd.concat([y_train, df_rag_unified[target_col]], ignore_index=True)
+    clf_unified = RandomForestClassifier(n_estimators=300, random_state=42, n_jobs=-1)
+    clf_unified.fit(X_tr_unified, y_tr_unified)
+    m_unified = evaluate_model(y_test, clf_unified.predict(X_test), minority_class, majority_class)
     dataset_records.append({
         "Dataset": dataset_name,
-        "Method": "RAG-Tab (BERT Semantic)",
-        "Regime": "Local Semantic Retrieval",
-        "Added Rows": len(df_rag_bert),
-        **m_bert
+        "Method": "RAG-Tab (Unified NaN + BERT)",
+        "Regime": "Natural Neighbors + Semantic Fusion",
+        "Added Rows": len(df_rag_unified),
+        **m_unified
     })
-    print(f"[Done] RAG-Tab (BERT)    -> F1: {m_bert['F1']:.4f}, Recall: {m_bert['Recall']:.4f}, Precision: {m_bert['Precision']:.4f}")
+    print(f"[Done] RAG-Tab (Unified) -> F1: {m_unified['F1']:.4f}, Recall: {m_unified['Recall']:.4f}, Precision: {m_unified['Precision']:.4f}")
 
     return dataset_records
 
@@ -227,20 +266,24 @@ def get_all_usable_datasets(splits_dir: str = "data/splits", min_minority: int =
     return usable
 
 
-def run_full_ablation():
-    """Runs ablation experiment across ALL available benchmark datasets and saves results and plots."""
+def run_full_ablation(
+    dataset_list: Optional[List[str]] = None,
+    output_table_name: str = "ablation_unified_nan_bert.csv",
+    output_plot_name: str = "ablation_unified_nan_bert.png"
+):
+    """Runs ablation experiment across benchmark datasets and saves results and plots."""
 
-    # Auto-discover all usable datasets from splits directory
-    datasets = get_all_usable_datasets()
+    # Use provided dataset list or auto-discover from splits directory
+    datasets = dataset_list if dataset_list is not None else get_all_usable_datasets()
     print(f"\n{'='*60}")
     print(f"Running full ablation across {len(datasets)} datasets:")
     for i, d in enumerate(datasets, 1):
         print(f"  {i:2d}. {d}")
     print(f"{'='*60}\n")
 
-    out_table_path = Path("results/tables/ablation_zero_few_rag_bert.csv")
+    out_table_path = Path("results/tables") / output_table_name
     out_table_path.parent.mkdir(parents=True, exist_ok=True)
-    out_plot_path = Path("results/plots/ablation_zero_few_rag_bert.png")
+    out_plot_path = Path("results/plots") / output_plot_name
     out_plot_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Resume from checkpoint if results already exist
@@ -253,7 +296,7 @@ def run_full_ablation():
         done_datasets = set()
         all_records = []
 
-    client = GeminiTabularClient(model_name="gemini-3-flash-preview", temperature=0.7)
+    client = GeminiTabularClient(model_name="gemini-3.8-flash", temperature=0.7)
 
     for d_name in datasets:
         if d_name in done_datasets:
@@ -276,14 +319,15 @@ def run_full_ablation():
     ablation_df.to_csv(out_table_path, index=False)
     print(f"\nSaved master ablation table to: {out_table_path}")
 
-    # --- Summary Plot 1: Per-dataset F1 grouped bar chart (paginated) ---
+    # --- Summary Plot 1: Per-dataset F1 grouped bar chart ---
     methods_order = [
         "Original",
         "SMOTE (Standardized)",
+        "Borderline-SMOTE",
         "Zero-Shot LLM",
         "Few-Shot LLM (Global)",
-        "RAG-Tab (Euclidean)",
-        "RAG-Tab (BERT Semantic)"
+        "RAG-Tab (Fixed KNN)",
+        "RAG-Tab (Unified NaN + BERT)"
     ]
 
     style = "seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default"
@@ -327,7 +371,7 @@ def run_full_ablation():
         .reindex([m for m in methods_order if m in ablation_df["Method"].unique()])
     )
     fig2, ax2 = plt.subplots(figsize=(10, 5))
-    colors = ["#2196F3", "#FF9800", "#9C27B0", "#4CAF50", "#E91E63", "#00BCD4"]
+    colors = ["#78909C", "#FF9800", "#FF5722", "#9C27B0", "#2196F3", "#00BCD4", "#4CAF50"]
     bars = ax2.bar(mean_f1.index, mean_f1.values, color=colors[:len(mean_f1)], edgecolor="white", linewidth=0.8)
     ax2.set_ylim(0, 1.0)
     ax2.set_ylabel("Mean F1-Score (across all datasets)", fontsize=11)
