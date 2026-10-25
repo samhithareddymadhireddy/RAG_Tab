@@ -1,12 +1,21 @@
 
 # RAG-Tab: Retrieval-Augmented Tabular Synthesis for Imbalanced Data
 
+[![Research Report](https://img.shields.io/badge/Research-Report-blue.svg)](RESEARCH_REPORT.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.13](https://img.shields.io/badge/Python-3.13-green.svg)](https://www.python.org/)
+
+> 📄 **Complete Research Report Available:**  
+> For an in-depth, self-contained explanation of the mathematical formulations, system architecture, equal-budget benchmarks, cross-classifier generalization, and challenges overcome, read the **[Complete Research Report (RESEARCH_REPORT.md)](RESEARCH_REPORT.md)**.
+
 **RAG-Tab** is a machine learning research framework investigating whether retrieving local minority-class neighbors as structural context for Large Language Models (LLMs) improves synthetic minority generation and downstream classification performance on imbalanced tabular datasets.
 
-The approach is inspired by the TMLR paper on structured data generation and combines:
-- **Euclidean-distance-based** local neighborhood retrieval (KNN in standardized feature space)
-- **BERT semantic-embedding-based** retrieval (`sentence-transformers/all-MiniLM-L6-v2`)
-- **Structured prompting** with variable schema descriptions, local topology metrics, and constrained JSON generation
+The approach combines:
+- **Natural Neighbours (NaN)** self-adaptive local neighborhood discovery (parameter-free characteristic $\lambda^*$)
+- **Sentence-BERT semantic verbalization** (`sentence-transformers/all-MiniLM-L6-v2`)
+- **Hybrid metric fusion** ($D_{\text{hybrid}} = 0.65 D_{\text{geo}} + 0.35 D_{\text{sem}}$)
+- **Structured prompting** with variable schema descriptions, local topology bounds, and constrained JSON generation
+- **Proportional manifold balance** and multi-stage quality control
 
 ---
 
