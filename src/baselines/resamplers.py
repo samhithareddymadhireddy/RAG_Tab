@@ -6,21 +6,26 @@ from imblearn.over_sampling import RandomOverSampler, SMOTE, BorderlineSMOTE, AD
 from imblearn.combine import SMOTETomek
 
 
-def get_resampler(method_name: str, random_state: int = 42):
+def get_resampler(
+    method_name: str,
+    random_state: int = 42,
+    sampling_strategy="auto",
+    k_neighbors: int = 5
+):
     """Instantiates a resampling algorithm by name."""
     name = method_name.lower().replace("-", "_").replace(" ", "_")
     if name in ("none", "original"):
         return None
     elif name in ("ros", "random_oversampling", "random_oversampler"):
-        return RandomOverSampler(random_state=random_state)
+        return RandomOverSampler(sampling_strategy=sampling_strategy, random_state=random_state)
     elif name == "smote":
-        return SMOTE(random_state=random_state)
+        return SMOTE(sampling_strategy=sampling_strategy, k_neighbors=k_neighbors, random_state=random_state)
     elif name in ("borderline_smote", "borderlinesmote"):
-        return BorderlineSMOTE(random_state=random_state)
+        return BorderlineSMOTE(sampling_strategy=sampling_strategy, k_neighbors=k_neighbors, random_state=random_state)
     elif name == "adasyn":
-        return ADASYN(random_state=random_state)
+        return ADASYN(sampling_strategy=sampling_strategy, n_neighbors=k_neighbors, random_state=random_state)
     elif name in ("smote_tomek", "smotetomek"):
-        return SMOTETomek(random_state=random_state)
+        return SMOTETomek(sampling_strategy=sampling_strategy, random_state=random_state)
     else:
         raise ValueError(f"Unknown resampling method: '{method_name}'")
 
@@ -30,6 +35,7 @@ def apply_resampling(
     y: pd.Series,
     method: str = "smote",
     scale_features: bool = False,
+    n_synthetic: Optional[int] = None,
     random_state: int = 42
 ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     """Applies a resampling method with optional feature scaling and provenance tracking.
@@ -46,6 +52,8 @@ def apply_resampling(
     scale_features : bool, default=False
         If True, standardizes features before computing nearest neighbors,
         then inverts the resampled features back to the original feature space.
+    n_synthetic : int, optional
+        Fixed budget of synthetic minority samples to generate (equal budget mode).
     random_state : int, default=42
         Seed for reproducibility.
 
@@ -59,7 +67,23 @@ def apply_resampling(
         Table with 'sample_id', 'origin' ('original', 'duplicate', 'synthetic'),
         and class label for every row.
     """
-    sampler = get_resampler(method, random_state=random_state)
+    sampling_strat = "auto"
+    k_neighbors = 5
+    if n_synthetic is not None:
+        pos_label = "positive" if "positive" in y.values else 1
+        neg_label = "negative" if "negative" in y.values else 0
+        n_pos = int((y == pos_label).sum())
+        n_neg = int((y == neg_label).sum())
+        target_pos = min(n_pos + n_synthetic, n_neg)
+        sampling_strat = {pos_label: target_pos, neg_label: n_neg}
+        k_neighbors = min(5, max(1, n_pos - 1))
+
+    sampler = get_resampler(
+        method,
+        random_state=random_state,
+        sampling_strategy=sampling_strat,
+        k_neighbors=k_neighbors
+    )
     if sampler is None:
         prov = pd.DataFrame({
             "sample_id": range(len(X)),
