@@ -234,91 +234,112 @@ def run_comprehensive_suite():
     # -------------------------------------------------------------
     sns.set_theme(style="whitegrid", font="sans-serif")
 
+    clean_names = {
+        "Original": "Original (No Resampling)",
+        "SMOTE (Equal Budget N=30)": "SMOTE (N=30)",
+        "Borderline-SMOTE (Equal Budget N=30)": "Borderline-SMOTE (N=30)",
+        "RAG-Tab (Unified NaN + BERT N=30)": "RAG-Tab (BERT, N=30)",
+        "SMOTE (Full Resampling)": "SMOTE (Full / Unconstrained)"
+    }
+
     # Plot 1: Equal Budget Precision vs Recall vs F1
     if not df_equal.empty:
-        summary_eq = df_equal.groupby("Method")[["Precision", "Recall", "F1", "Specificity", "G-Mean"]].mean().reset_index()
-        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        df_eq_copy = df_equal.copy()
+        df_eq_copy["Clean_Method"] = df_eq_copy["Method"].map(lambda x: clean_names.get(x, x))
+        method_order = [
+            "Original (No Resampling)",
+            "SMOTE (Full / Unconstrained)",
+            "Borderline-SMOTE (N=30)",
+            "SMOTE (N=30)",
+            "RAG-Tab (BERT, N=30)"
+        ]
+        summary_eq = df_eq_copy.groupby("Clean_Method")[["Precision", "Recall", "F1", "Specificity", "G-Mean"]].mean().reindex(method_order).reset_index()
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
         
-        # Precision
-        sns.barplot(data=summary_eq, x="Method", y="Precision", ax=axes[0], palette="Blues_d")
-        axes[0].set_title("Equal-Budget Precision (N=30)", fontsize=13, fontweight="bold")
-        axes[0].set_ylim(0, 1.0)
-        axes[0].tick_params(axis='x', rotation=25)
-        for p in axes[0].patches:
-            axes[0].annotate(f"{p.get_height():.3f}", (p.get_x() + p.get_width() / 2., p.get_height() / 2),
-                             ha='center', va='center', color='white', fontweight='bold', fontsize=11)
+        metrics = [
+            ("Precision", "Equal-Budget Precision", "Blues_r", axes[0]),
+            ("Recall", "Equal-Budget Recall", "Greens_r", axes[1]),
+            ("F1", "Equal-Budget Macro F1-Score", "magma", axes[2])
+        ]
+        for col, title, palette, ax in metrics:
+            sns.barplot(data=summary_eq, y="Clean_Method", x=col, ax=ax, palette=palette, edgecolor="black", linewidth=0.8)
+            ax.set_title(title, fontsize=13, fontweight="bold", pad=12)
+            ax.set_xlim(0, 1.05)
+            ax.set_xlabel(col, fontsize=11, fontweight="semibold")
+            ax.set_ylabel("" if ax != axes[0] else "Method", fontsize=11, fontweight="semibold")
+            for p in ax.patches:
+                val = p.get_width()
+                ax.annotate(f" {val:.3f}", (val, p.get_y() + p.get_height() / 2.),
+                            va='center', ha='left', color='black', fontweight='bold', fontsize=10.5)
 
-        # Recall
-        sns.barplot(data=summary_eq, x="Method", y="Recall", ax=axes[1], palette="Greens_d")
-        axes[1].set_title("Equal-Budget Recall (N=30)", fontsize=13, fontweight="bold")
-        axes[1].set_ylim(0, 1.0)
-        axes[1].tick_params(axis='x', rotation=25)
-        for p in axes[1].patches:
-            axes[1].annotate(f"{p.get_height():.3f}", (p.get_x() + p.get_width() / 2., p.get_height() / 2),
-                             ha='center', va='center', color='white', fontweight='bold', fontsize=11)
-
-        # F1 Score
-        sns.barplot(data=summary_eq, x="Method", y="F1", ax=axes[2], palette="magma")
-        axes[2].set_title("Equal-Budget F1-Score (N=30)", fontsize=13, fontweight="bold")
-        axes[2].set_ylim(0, 1.0)
-        axes[2].tick_params(axis='x', rotation=25)
-        for p in axes[2].patches:
-            axes[2].annotate(f"{p.get_height():.3f}", (p.get_x() + p.get_width() / 2., p.get_height() / 2),
-                             ha='center', va='center', color='white', fontweight='bold', fontsize=11)
-
+        plt.suptitle("Equal-Budget Synthetic Data Benchmark (N_syn = 30 across 10 OpenML Datasets)", fontsize=15, fontweight="bold", y=1.02)
         plt.tight_layout()
-        plt.savefig(plots_dir / "equal_budget_comparison.png", dpi=300)
+        plt.savefig(plots_dir / "equal_budget_comparison.png", dpi=300, bbox_inches="tight")
         plt.close()
         print(f"  [Plot Saved] {plots_dir / 'equal_budget_comparison.png'}")
 
     # Plot 2: Cross-Classifier Generalization
     if not df_multi.empty:
-        summary_multi = df_multi.groupby(["Classifier", "Method"])[["Precision", "F1"]].mean().reset_index()
+        df_multi_copy = df_multi.copy()
+        df_multi_copy["Clean_Method"] = df_multi_copy["Method"].map(lambda x: clean_names.get(x, x))
+        summary_multi = df_multi_copy.groupby(["Classifier", "Clean_Method"])[["Precision", "F1"]].mean().reset_index()
         fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
-        sns.barplot(data=summary_multi, x="Classifier", y="Precision", hue="Method", ax=axes[0], palette="Set2")
-        axes[0].set_title("Macro Precision Across Classifier Inductive Biases", fontsize=13, fontweight="bold")
-        axes[0].set_ylim(0, 1.0)
-        axes[0].legend(loc="lower right")
+        sns.barplot(data=summary_multi, x="Classifier", y="Precision", hue="Clean_Method", ax=axes[0], palette="Set2", edgecolor="black", linewidth=0.8)
+        axes[0].set_title("Macro Precision Across Classifier Inductive Biases", fontsize=13, fontweight="bold", pad=12)
+        axes[0].set_ylim(0, 1.1)
+        axes[0].set_xlabel("Downstream Classifier Family", fontsize=11, fontweight="semibold")
+        axes[0].set_ylabel("Macro Precision", fontsize=11, fontweight="semibold")
+        axes[0].legend(loc="lower right", framealpha=0.95, fontsize=10)
+        for p in axes[0].patches:
+            h = p.get_height()
+            if h > 0.05:
+                axes[0].annotate(f"{h:.2f}", (p.get_x() + p.get_width() / 2., h + 0.015),
+                                 ha='center', va='bottom', fontsize=8.5, fontweight='bold')
 
-        sns.barplot(data=summary_multi, x="Classifier", y="F1", hue="Method", ax=axes[1], palette="Set2")
-        axes[1].set_title("Macro F1 Across Classifier Inductive Biases", fontsize=13, fontweight="bold")
-        axes[1].set_ylim(0, 1.0)
-        axes[1].legend(loc="lower right")
+        sns.barplot(data=summary_multi, x="Classifier", y="F1", hue="Clean_Method", ax=axes[1], palette="Set2", edgecolor="black", linewidth=0.8)
+        axes[1].set_title("Macro F1 Across Classifier Inductive Biases", fontsize=13, fontweight="bold", pad=12)
+        axes[1].set_ylim(0, 1.1)
+        axes[1].set_xlabel("Downstream Classifier Family", fontsize=11, fontweight="semibold")
+        axes[1].set_ylabel("Macro F1-Score", fontsize=11, fontweight="semibold")
+        axes[1].legend(loc="lower right", framealpha=0.95, fontsize=10)
+        for p in axes[1].patches:
+            h = p.get_height()
+            if h > 0.05:
+                axes[1].annotate(f"{h:.2f}", (p.get_x() + p.get_width() / 2., h + 0.015),
+                                 ha='center', va='bottom', fontsize=8.5, fontweight='bold')
 
+        plt.suptitle("Cross-Classifier Generalization (Random Forest vs. HistGBDT vs. Logistic Regression)", fontsize=15, fontweight="bold", y=1.02)
         plt.tight_layout()
-        plt.savefig(plots_dir / "multiclassifier_generalization.png", dpi=300)
+        plt.savefig(plots_dir / "multiclassifier_generalization.png", dpi=300, bbox_inches="tight")
         plt.close()
         print(f"  [Plot Saved] {plots_dir / 'multiclassifier_generalization.png'}")
 
     # Plot 3: Generative Distribution Fidelity & DCR
     if not df_fid.empty:
-        summary_fid = df_fid.groupby("Method")[["Mean_Wasserstein", "Correlation_Frobenius_Diff", "DCR_Mean"]].mean().reset_index()
+        df_fid_copy = df_fid.copy()
+        df_fid_copy["Clean_Method"] = df_fid_copy["Method"].map(lambda x: clean_names.get(x, x))
+        summary_fid = df_fid_copy.groupby("Clean_Method")[["Mean_Wasserstein", "Correlation_Frobenius_Diff", "DCR_Mean"]].mean().reset_index()
         fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-        sns.barplot(data=summary_fid, x="Method", y="Mean_Wasserstein", ax=axes[0], palette="mako")
-        axes[0].set_title("Wasserstein-1 Distance (Lower is Better)", fontsize=12, fontweight="bold")
-        axes[0].tick_params(axis='x', rotation=20)
-        for p in axes[0].patches:
-            axes[0].annotate(f"{p.get_height():.3f}", (p.get_x() + p.get_width() / 2., p.get_height() / 2),
-                             ha='center', va='center', color='white', fontweight='bold', fontsize=11)
+        f_metrics = [
+            ("Mean_Wasserstein", "Wasserstein-1 Distance\n(Lower is Better)", "mako", axes[0]),
+            ("Correlation_Frobenius_Diff", "Correlation Matrix Error ||C_syn - C_real||_F\n(Lower is Better)", "rocket", axes[1]),
+            ("DCR_Mean", "Distance to Closest Record (DCR)\n(Strictly > 0 = No Memorization)", "crest", axes[2])
+        ]
+        for col, title, palette, ax in f_metrics:
+            sns.barplot(data=summary_fid, y="Clean_Method", x=col, ax=ax, palette=palette, edgecolor="black", linewidth=0.8)
+            ax.set_title(title, fontsize=12, fontweight="bold", pad=10)
+            ax.set_xlabel(col, fontsize=11, fontweight="semibold")
+            ax.set_ylabel("" if ax != axes[0] else "Method", fontsize=11, fontweight="semibold")
+            for p in ax.patches:
+                val = p.get_width()
+                ax.annotate(f" {val:.3f}", (val, p.get_y() + p.get_height() / 2.),
+                            va='center', ha='left', color='black', fontweight='bold', fontsize=10)
 
-        sns.barplot(data=summary_fid, x="Method", y="Correlation_Frobenius_Diff", ax=axes[1], palette="rocket")
-        axes[1].set_title("Correlation Frobenius Difference (Lower is Better)", fontsize=12, fontweight="bold")
-        axes[1].tick_params(axis='x', rotation=20)
-        for p in axes[1].patches:
-            axes[1].annotate(f"{p.get_height():.3f}", (p.get_x() + p.get_width() / 2., p.get_height() / 2),
-                             ha='center', va='center', color='white', fontweight='bold', fontsize=11)
-
-        sns.barplot(data=summary_fid, x="Method", y="DCR_Mean", ax=axes[2], palette="crest")
-        axes[2].set_title("Distance to Closest Record (DCR > 0 = Privacy)", fontsize=12, fontweight="bold")
-        axes[2].tick_params(axis='x', rotation=20)
-        for p in axes[2].patches:
-            axes[2].annotate(f"{p.get_height():.3f}", (p.get_x() + p.get_width() / 2., p.get_height() / 2),
-                             ha='center', va='center', color='white', fontweight='bold', fontsize=11)
-
+        plt.suptitle("Generative Distribution Fidelity & Privacy Guarantees", fontsize=15, fontweight="bold", y=1.03)
         plt.tight_layout()
-        plt.savefig(plots_dir / "generative_fidelity_and_privacy.png", dpi=300)
+        plt.savefig(plots_dir / "generative_fidelity_and_privacy.png", dpi=300, bbox_inches="tight")
         plt.close()
         print(f"  [Plot Saved] {plots_dir / 'generative_fidelity_and_privacy.png'}")
 
