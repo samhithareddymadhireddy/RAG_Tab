@@ -61,6 +61,7 @@ def build_generation_prompt(
     context: Optional[NeighborhoodContext] = None,
     few_shot_examples: Optional[pd.DataFrame] = None,
     domain_report: Optional[str] = None,
+    target_class: Optional[str] = None,
     n_samples: int = 1
 ) -> str:
     """Prompt 3: Constrained data generation prompt supporting Zero-Shot, Few-Shot, and RAG-Tab.
@@ -77,11 +78,14 @@ def build_generation_prompt(
         Global training minority instances (required for 'few_shot').
     domain_report : str, optional
         High-level domain context report (from Stage 1).
+    target_class : str, optional
+        Target class label to synthesize (defaults to schema.minority_class).
     n_samples : int, default=1
         Target number of synthetic minority samples ($N-OUT).
     """
     mode = mode.lower()
-    schema_text = schema.to_prompt_schema()
+    chosen_target = target_class if target_class is not None else schema.minority_class
+    schema_text = schema.to_prompt_schema(target_class=chosen_target)
 
     report_section = ""
     if domain_report:
@@ -139,7 +143,7 @@ The sequence of operations must output exactly {n_samples} data points ($N-OUT={
 {schema_text}
 
 === CONSTRAINED GENERATION RULES ($DATA-GENERATION-JSON-SCHEMA) ===
-1. Target Label: Every generated row must have `"{schema.target_col}": "{schema.minority_class}"`.
+1. Target Label: Every generated row must have `"{schema.target_col}": "{chosen_target}"`.
 2. Schema Adherence: Return ONLY a valid JSON array of {n_samples} objects with the exact variable names provided above.
 3. Domain Validity:
    - Numerical values must strictly respect the valid domain ranges specified.

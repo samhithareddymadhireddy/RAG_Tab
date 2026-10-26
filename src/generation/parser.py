@@ -1,7 +1,7 @@
 """JSON parser, schema validator, and error handling for LLM tabular generation."""
 import json
 import re
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import pandas as pd
 
 
@@ -39,7 +39,8 @@ def parse_and_validate_tabular_json(
     raw_text: str,
     feature_cols: List[str],
     target_col: str = "Class",
-    minority_class: str = "positive"
+    minority_class: str = "positive",
+    target_class: Optional[str] = None
 ) -> Tuple[pd.DataFrame, List[Dict[str, Any]], Dict[str, int]]:
     """Parses JSON text into a validated pandas DataFrame, recording rejection reasons.
 
@@ -52,7 +53,9 @@ def parse_and_validate_tabular_json(
     target_col : str
         Target column name.
     minority_class : str
-        Expected target value for synthesized samples.
+        Expected target value for synthesized samples (default 'positive').
+    target_class : str, optional
+        Target class override for multiclass synthesis.
 
     Returns
     -------
@@ -125,7 +128,8 @@ def parse_and_validate_tabular_json(
             continue
 
         # Target column
-        row_vals[target_col] = minority_class
+        chosen_class = target_class if target_class is not None else minority_class
+        row_vals[target_col] = chosen_class
         valid_rows.append(row_vals)
 
     valid_df = pd.DataFrame(valid_rows)

@@ -73,6 +73,7 @@ def download_dataset(
     raw_dir: str | Path = "data/raw",
     splits_dir: str | Path = "data/splits",
     test_size: float = 0.20,
+    as_multiclass: bool = False,
     random_state: int = 42
 ) -> Tuple[Path, Path, Dict[str, Any]]:
     """Downloads an OpenML dataset, encodes target, and prepares frozen splits."""
@@ -104,16 +105,21 @@ def download_dataset(
     # Drop missing values
     df = df.dropna().reset_index(drop=True)
 
-    # Encode target into binary minority ('positive') and majority ('negative')
-    target_counts = df[target_col].value_counts()
-    if min_override and min_override in target_counts:
-        minority_label = min_override
-    else:
-        minority_label = target_counts.idxmin()
+    save_prefix = f"{dataset_key}_multiclass" if as_multiclass else dataset_key
 
-    # Binary mapping: minority -> 'positive', others -> 'negative'
-    binary_y = df[target_col].apply(lambda x: "positive" if str(x) == str(minority_label) else "negative")
-    df["Class"] = binary_y
+    if as_multiclass:
+        # Preserve all original multiclass labels
+        df["Class"] = df[target_col].astype(str)
+    else:
+        # Encode target into binary minority ('positive') and majority ('negative')
+        target_counts = df[target_col].value_counts()
+        if min_override and min_override in target_counts:
+            minority_label = min_override
+        else:
+            minority_label = target_counts.idxmin()
+
+        binary_y = df[target_col].apply(lambda x: "positive" if str(x) == str(minority_label) else "negative")
+        df["Class"] = binary_y
 
     feature_cols = [c for c in df.columns if c not in (target_col, "Class")]
 
@@ -125,7 +131,7 @@ def download_dataset(
     clean_df = df[feature_cols + ["Class"]].copy()
 
     # Save raw CSV
-    csv_file = raw_path / f"{dataset_key}.csv"
+    csv_file = raw_path / f"{save_prefix}.csv"
     clean_df.to_csv(csv_file, index=False)
 
     # Stratified split
@@ -138,8 +144,8 @@ def download_dataset(
     test_df = X_te.copy()
     test_df["Class"] = y_te.values
 
-    tr_file = splits_path / f"{dataset_key}_train.csv"
-    te_file = splits_path / f"{dataset_key}_test.csv"
+    tr_file = splits_path / f"{save_prefix}_train.csv"
+    te_file = splits_path / f"{save_prefix}_test.csv"
     train_df.to_csv(tr_file, index=False)
     test_df.to_csv(te_file, index=False)
 

@@ -146,6 +146,14 @@ class GeminiTabularClient:
             except Exception:
                 pass
 
+        # Extract target class from prompt rules (multiclass and binary support)
+        target_val = "positive"
+        m_target = re.search(r'["\'](?:Class|target)["\']:\s*["\']([^"\']+)["\']', prompt, re.IGNORECASE)
+        if not m_target:
+            m_target = re.search(r'target class\s*["\']([^"\']+)["\']', prompt, re.IGNORECASE)
+        if m_target:
+            target_val = m_target.group(1)
+
         mock_rows = []
         for _ in range(n_samples):
             row = {}
@@ -156,7 +164,7 @@ class GeminiTabularClient:
                     # Perturb around mean within bounds
                     val = np.random.normal(mean_val, (high - low) / 6.0)
                     row[col] = round(float(np.clip(val, low, high)), 4)
-            row["Class"] = "positive"
+            row["Class"] = target_val
             mock_rows.append(row)
 
         return json.dumps(mock_rows, indent=2)

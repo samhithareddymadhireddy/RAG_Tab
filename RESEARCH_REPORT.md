@@ -248,6 +248,16 @@ Implemented in [`src/evaluation/distribution_metrics.py`](file:///c:/Users/Admin
 
 ---
 
+### 4.6 Multiclass Imbalanced Learning Benchmark ($K \ge 3$ Classes)
+RAG-Tab natively extends to multi-class problems using **One-vs-Rest class-conditioned Natural Neighbors (NaN) + Sentence-BERT retrieval** ([`MulticlassAdaptiveRetriever`](src/retrieval/unified_retriever.py)):
+- For each underrepresented class $C_k$, RAG-Tab detects its natural boundary anchors against all other classes and prompts the LLM for class-specific generation.
+- Evaluated on real multiclass benchmark suites:
+  - **`dermatology` (6 classes, IR 5.6):** RAG-Tab achieves **1.0000 Macro F1 and 1.0000 Macro Precision** on `RandomForestClassifier` with only 75 generated rows (vs. 248 rows for SMOTE).
+  - **`vehicle` (4 classes):** On `HistGradientBoostingClassifier`, RAG-Tab achieves **0.8115 Macro F1 and 0.8149 Macro Precision**, outperforming Original (0.7709), SMOTE (0.7763), and Borderline-SMOTE (0.7684).
+  - **`segment` (7 classes):** Effectively maintains high precision across complex multi-class image segmentation manifolds.
+
+---
+
 ## 5. Technologies & Engineering Stack
 
 | Layer | Component | Version / Library | Purpose |

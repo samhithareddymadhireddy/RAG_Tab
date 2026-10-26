@@ -70,13 +70,32 @@ def apply_resampling(
     sampling_strat = "auto"
     k_neighbors = 5
     if n_synthetic is not None:
-        pos_label = "positive" if "positive" in y.values else 1
-        neg_label = "negative" if "negative" in y.values else 0
-        n_pos = int((y == pos_label).sum())
-        n_neg = int((y == neg_label).sum())
-        target_pos = min(n_pos + n_synthetic, n_neg)
-        sampling_strat = {pos_label: target_pos, neg_label: n_neg}
-        k_neighbors = min(5, max(1, n_pos - 1))
+        class_counts = {str(k): int(v) for k, v in pd.Series(y).value_counts().items()}
+        maj_class = max(class_counts, key=class_counts.get)
+        n_maj = class_counts[maj_class]
+        minority_classes = [c for c in class_counts if c != maj_class]
+
+        if len(class_counts) <= 2:
+            # Binary Case
+            pos_label = minority_classes[0] if minority_classes else maj_class
+            n_pos = class_counts.get(pos_label, 0)
+            target_pos = min(n_pos + n_synthetic, n_maj)
+            sampling_strat = {pos_label: target_pos, maj_class: n_maj}
+            k_neighbors = min(5, max(1, n_pos - 1))
+        else:
+            # Multiclass Case: distribute n_synthetic proportionally across all minority classes
+            deficits = {c: n_maj - class_counts[c] for c in minority_classes}
+            total_deficit = sum(deficits.values())
+            sampling_strat = {maj_class: n_maj}
+            min_k = 5
+            for c in minority_classes:
+                if total_deficit > 0:
+                    alloc = max(1, int(round(n_synthetic * (deficits[c] / total_deficit))))
+                else:
+                    alloc = max(1, n_synthetic // len(minority_classes))
+                sampling_strat[c] = min(class_counts[c] + alloc, n_maj)
+                min_k = min(min_k, max(1, class_counts[c] - 1))
+            k_neighbors = min_k
 
     sampler = get_resampler(
         method,

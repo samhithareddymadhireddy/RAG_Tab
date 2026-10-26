@@ -1,5 +1,5 @@
 """Tabular dataset schema definitions and physical domain constraints."""
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import pandas as pd
 
 
@@ -17,6 +17,20 @@ class TabularDatasetSchema:
         self.minority_class = minority_class
         self.dataset_description = dataset_description
         self.feature_cols = [c for c in df.columns if c != target_col]
+
+        # Extract target class distributions
+        if target_col in df.columns:
+            self.target_counts = {str(k): int(v) for k, v in df[target_col].value_counts().items()}
+            self.classes = list(self.target_counts.keys())
+            self.majority_class = max(self.target_counts, key=self.target_counts.get) if self.target_counts else "negative"
+            self.minority_classes = [c for c in self.classes if c != self.majority_class]
+            if not self.minority_class and self.minority_classes:
+                self.minority_class = self.minority_classes[0]
+        else:
+            self.target_counts = {}
+            self.classes = []
+            self.majority_class = "negative"
+            self.minority_classes = []
 
         # Extract empirical bounds and datatypes from training data only
         self.features_info: Dict[str, Dict[str, Any]] = {}
@@ -45,9 +59,14 @@ class TabularDatasetSchema:
             "Wb_trans": "Total count of white-to-black transitions."
         }
 
-    def to_prompt_schema(self) -> str:
+    def to_prompt_schema(self, target_class: Optional[str] = None) -> str:
         """Formats feature constraints into a clear markdown prompt schema."""
-        lines = [f"Dataset: {self.dataset_description}", "Feature Specifications:"]
+        chosen_target = target_class if target_class is not None else self.minority_class
+        lines = [f"Dataset: {self.dataset_description}"]
+        if len(self.classes) > 2:
+            lines.append(f"Multiclass Imbalance Distribution: {self.target_counts}")
+        lines.append("Feature Specifications:")
+
         desc_map = self.get_feature_descriptions()
         for col, info in self.features_info.items():
             desc = desc_map.get(col, "Numerical feature.")
@@ -56,5 +75,5 @@ class TabularDatasetSchema:
                 f"Valid domain range: [{info['min']:.2f}, {info['max']:.2f}], "
                 f"training mean: {info['mean']:.2f}"
             )
-        lines.append(f"- `{self.target_col}`: Must always be the minority class '{self.minority_class}'.")
+        lines.append(f"- `{self.target_col}`: Must always be the target class '{chosen_target}'.")
         return "\n".join(lines)

@@ -314,6 +314,25 @@ We audited statistical fidelity and non-memorization across feature marginals an
 
 ---
 
+### 5. Multiclass Imbalanced Learning Benchmark ($K \ge 3$ Classes)
+
+RAG-Tab natively extends to multiclass imbalanced classification via **One-vs-Rest class-conditioned Natural Neighbors (NaN) + Sentence-BERT retrieval** ([`MulticlassAdaptiveRetriever`](src/retrieval/unified_retriever.py)). For each underrepresented minority class, RAG-Tab detects its inter-class boundary anchors and generates class-specific synthetic exemplars.
+
+| Dataset | Classes | Primary Classifier | Method | Added Rows | Macro Precision | Macro Recall | Macro F1-Score | Macro Specificity | G-Mean |
+|---|---|---|---|---|---|---|---|---|---|
+| **dermatology** | 6 classes | Random Forest | Original | 0 | 0.9928 | 0.9583 | 0.9725 | 0.9967 | 0.9532 |
+| | | Random Forest | SMOTE (Multiclass) | 248 | **1.0000** | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+| | | Random Forest | **RAG-Tab (Multiclass NaN+BERT)** | **75** | **1.0000** | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+| **vehicle** | 4 classes | HistGradientBoosting | Original | 0 | 0.7726 | 0.7719 | 0.7709 | 0.9232 | 0.7373 |
+| | | HistGradientBoosting | SMOTE (Multiclass) | 20 | 0.7788 | 0.7776 | 0.7763 | 0.9251 | 0.7438 |
+| | | HistGradientBoosting | **RAG-Tab (Multiclass NaN+BERT)** | 45 | **0.8149** | **0.8125** | **0.8115** | **0.9369** | **0.7894** |
+| **segment** | 7 classes | HistGradientBoosting | Original | 0 | 0.9830 | 0.9827 | 0.9827 | 0.9971 | 0.9825 |
+| | | HistGradientBoosting | **RAG-Tab (Multiclass NaN+BERT)** | 90 | 0.9746 | 0.9740 | 0.9741 | 0.9957 | 0.9737 |
+
+![Multiclass Benchmark](results/plots/multiclass_benchmark.png)
+
+---
+
 ## 🛠️ Method Overview
 
 ### 1. Prompt Architecture (TMLR-Inspired)
