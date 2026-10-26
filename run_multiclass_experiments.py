@@ -164,6 +164,13 @@ def run_multiclass_benchmark():
         except Exception as e:
             print(f"  [Warning] Borderline-SMOTE failed: {e}")
 
+        # GAMO (Generative Adversarial Minority Oversampling)
+        try:
+            X_gamo, y_gamo, _ = apply_resampling(X_train, y_train, method="gamo", random_state=42)
+            datasets_map["GAMO (Multiclass)"] = (X_gamo, y_gamo, len(X_gamo) - len(X_train))
+        except Exception as e:
+            print(f"  [Warning] GAMO failed: {e}")
+
         # RAG-Tab (Multiclass Adaptive NaN + BERT)
         try:
             X_rag, y_rag, n_added = run_rag_tab_multiclass(

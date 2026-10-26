@@ -34,8 +34,8 @@ class GeminiTabularClient:
         self.temperature = temperature
         self.mock_mode = mock_mode
 
-        # If no valid API key is found, automatically run in offline validation mock mode
-        if not self.api_key or self.api_key == "your_gemini_api_key_here":
+        # If no valid Google AI Studio API key (starts with AIza) is found, automatically run in offline mock mode
+        if not self.api_key or not self.api_key.startswith("AIza"):
             self.mock_mode = True
 
     def generate(self, prompt: str) -> str:
@@ -52,11 +52,12 @@ class GeminiTabularClient:
             "gemini-3-flash-preview",
             "gemini-flash-lite-latest"
         ]
-        # Circuit breaker: if currently in 429 cooldown, immediately use schema generation
+        # Circuit breaker: if currently in cooldown, immediately use schema generation
         cooldown = getattr(self, "_cooldown_until", 0)
         if time.time() < cooldown:
             return self._generate_mock_response(prompt)
 
+        last_error = "unknown"
         for model in candidate_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
             payload = {
@@ -67,7 +68,7 @@ class GeminiTabularClient:
                 }
             }
             try:
-                with httpx.Client(timeout=30.0) as client:
+                with httpx.Client(timeout=5.0) as client:
                     resp = client.post(url, json=payload)
                     if resp.status_code == 200:
                         data = resp.json()
@@ -78,7 +79,6 @@ class GeminiTabularClient:
                                 return parts[0].get("text", "")
                     elif resp.status_code == 429:
                         last_error = f"HTTP 429 rate limit on {model}"
-                        # Set 60-second cooldown so subsequent calls in this minute don't block
                         self._cooldown_until = time.time() + 60.0
                         break
                     elif resp.status_code in (404, 503):
@@ -86,9 +86,12 @@ class GeminiTabularClient:
                         continue
                     else:
                         last_error = f"HTTP {resp.status_code}: {resp.text}"
+                        self._cooldown_until = time.time() + 3600.0
                         break
             except Exception as e:
                 last_error = str(e)
+                self._cooldown_until = time.time() + 300.0
+                break
 
         print(f"[Note] Gemini API rate-limited or unavailable ({last_error}). Using schema-aware generation.")
         return self._generate_mock_response(prompt)

@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from imblearn.over_sampling import RandomOverSampler, SMOTE, BorderlineSMOTE, ADASYN
 from imblearn.combine import SMOTETomek
+from src.baselines.gamo import GAMOResampler
 
 
 def get_resampler(
@@ -26,6 +27,8 @@ def get_resampler(
         return ADASYN(sampling_strategy=sampling_strategy, n_neighbors=k_neighbors, random_state=random_state)
     elif name in ("smote_tomek", "smotetomek"):
         return SMOTETomek(sampling_strategy=sampling_strategy, random_state=random_state)
+    elif name in ("gamo", "gamo_resampler"):
+        return GAMOResampler(random_state=random_state)
     else:
         raise ValueError(f"Unknown resampling method: '{method_name}'")
 
@@ -96,6 +99,19 @@ def apply_resampling(
                 sampling_strat[c] = min(class_counts[c] + alloc, n_maj)
                 min_k = min(min_k, max(1, class_counts[c] - 1))
             k_neighbors = min_k
+
+    if "gamo" in method.lower():
+        sampler = GAMOResampler(random_state=random_state)
+        X_res, y_res = sampler.fit_resample(X, y, n_synthetic=n_synthetic)
+        n_orig = len(X)
+        n_total = len(X_res)
+        origins = ["original" if i < n_orig else "synthetic" for i in range(n_total)]
+        prov = pd.DataFrame({
+            "sample_id": range(n_total),
+            "origin": origins,
+            "Class": y_res.values
+        })
+        return X_res, y_res, prov
 
     sampler = get_resampler(
         method,

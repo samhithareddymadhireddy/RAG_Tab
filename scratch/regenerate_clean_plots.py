@@ -29,6 +29,8 @@ def regenerate_clean_plots():
         "SMOTE (Full Resampling)": "SMOTE (Full / Unconstrained)",
         "SMOTE (Multiclass)": "SMOTE (Multiclass)",
         "Borderline-SMOTE (Multiclass)": "Borderline-SMOTE (Multiclass)",
+        "GAMO (Multiclass)": "GAMO (Adversarial)",
+        "GAMO (Equal Budget N=30)": "GAMO (N=30)",
         "RAG-Tab (Multiclass NaN + BERT)": "RAG-Tab (BERT Multiclass)"
     }
 
