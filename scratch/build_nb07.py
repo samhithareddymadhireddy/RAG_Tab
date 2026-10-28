@@ -135,22 +135,24 @@ We evaluate across three distinct learning paradigms:
 3. **Logistic Regression:** Convex optimization with a global linear hyperplane.
 """))
 
-    # Cell 10: Code Table 3
+# Cell 10: Code Table 3
     cells.append(nbf.v4.new_code_cell("""df_clf = pd.read_csv(tables_dir / "multiclassifier_generalization_benchmark.csv")
 df_clf["Clean_Method"] = df_clf["Method"].map(lambda x: clean_names.get(x, x))
 
 summary_clf = df_clf.groupby(["Classifier", "Clean_Method"])[["Precision", "Recall", "F1", "Specificity", "G-Mean"]].mean().reset_index()
 
-styled_clf = summary_clf.style.format({
-    "Precision": "{:.4f}",
-    "Recall": "{:.4f}",
-    "F1": "{:.4f}",
-    "Specificity": "{:.4f}",
-    "G-Mean": "{:.4f}"
-}).highlight_max(subset=["Precision", "F1", "Specificity"], color="#d4edda")\\
-  .set_caption("<b>Table 3: Performance Across 3 Downstream Classifier Families</b>")
-
-display(styled_clf)
+# Display each classifier family with per-group highlights
+for clf_name in ["HistGradientBoosting", "Random Forest", "Logistic Regression"]:
+    sub_df = summary_clf[summary_clf["Classifier"] == clf_name].drop(columns=["Classifier"])
+    styled_sub = sub_df.style.format({
+        "Precision": "{:.4f}",
+        "Recall": "{:.4f}",
+        "F1": "{:.4f}",
+        "Specificity": "{:.4f}",
+        "G-Mean": "{:.4f}"
+    }).highlight_max(subset=["Precision", "F1", "Specificity", "G-Mean"], color="#d4edda")\\
+      .set_caption(f"<b>Table 3 ({clf_name}): Performance Across Resampling Strategies</b>")
+    display(styled_sub)
 """))
 
     # Cell 11: Code Plot 3
