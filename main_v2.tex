@@ -14,13 +14,65 @@
 
 \raggedbottom
 
+% Robust author and affiliation handling for sn-jnl class
+\makeatletter
+\@ifundefined{author@star@opt}{
+  \def\author{\@ifstar\author@star\author@nostar}
+  \def\author@star{\@ifnextchar[{\author@star@opt}{\author@star@noopt}}
+  \def\author@nostar{\@ifnextchar[{\author@nostar@opt}{\author@nostar@noopt}}
+  \def\author@star@opt[#1]#2{%
+    \ifx\@author\@empty
+      \gdef\@author{#2\textsuperscript{#1,*}}%
+    \else
+      \g@addto@macro\@author{, #2\textsuperscript{#1,*}}%
+    \fi
+  }
+  \def\author@star@noopt#1{%
+    \ifx\@author\@empty
+      \gdef\@author{#1\textsuperscript{*}}%
+    \else
+      \g@addto@macro\@author{, #1\textsuperscript{*}}%
+    \fi
+  }
+  \def\author@nostar@opt[#1]#2{%
+    \ifx\@author\@empty
+      \gdef\@author{#2\textsuperscript{#1}}%
+    \else
+      \g@addto@macro\@author{, #2\textsuperscript{#1}}%
+    \fi
+  }
+  \def\author@nostar@noopt#1{%
+    \ifx\@author\@empty
+      \gdef\@author{#1}%
+    \else
+      \g@addto@macro\@author{, #1}%
+    \fi
+  }
+  \def\@author{}
+}{}
+\@ifundefined{affil@star@opt}{
+  \let\orig@affil\affil
+  \def\affil{\@ifstar\affil@star\affil@nostar}
+  \def\affil@star{\@ifnextchar[{\affil@star@opt}{\affil@star@noopt}}
+  \def\affil@nostar{\@ifnextchar[{\affil@nostar@opt}{\affil@nostar@noopt}}
+  \def\affil@star@opt[#1]#2{\g@addto@macro\affil@list{\par\textsuperscript{#1,*}#2}}
+  \def\affil@star@noopt#1{\g@addto@macro\affil@list{\par\textsuperscript{*}#1}}
+  \def\affil@nostar@opt[#1]#2{\g@addto@macro\affil@list{\par\textsuperscript{#1}#2}}
+  \def\affil@nostar@noopt#1{\g@addto@macro\affil@list{\par#1}}
+}{}
+\makeatother
+
 \begin{document}
 
 \title[Retrieval-Guided Synthetic Oversampling]{Retrieval-Guided Synthetic Oversampling for Imbalanced Tabular Learning: An Empirical Study with Natural Neighbors and Semantic Embeddings}
 
 \author*[1]{\fnm{Samhitha Reddy} \sur{Madhireddy}}\email{\textbf{[TODO: author.email@institution.edu]}}
+\author[2]{\fnm{Archana} \sur{Deshmukh}}\email{\textbf{[TODO: author2.email@institution.edu]}}
+\author[3]{\fnm{Dhwani} \sur{\textbf{[TODO: Surname]}}}\email{\textbf{[TODO: author3.email@institution.edu]}}
 
 \affil*[1]{\orgdiv{\textbf{[TODO: Department/Division of Computer Science]}}, \orgname{\textbf{[TODO: University/Research Institution]}}, \orgaddress{\city{\textbf{[TODO: City]}}, \country{\textbf{[TODO: Country]}}}}
+\affil[2]{\orgdiv{\textbf{[TODO: Department/Division of Computer Science]}}, \orgname{\textbf{[TODO: University/Research Institution]}}, \orgaddress{\city{\textbf{[TODO: City]}}, \country{\textbf{[TODO: Country]}}}}
+\affil[3]{\orgdiv{\textbf{[TODO: Department/Division of Computer Science]}}, \orgname{\textbf{[TODO: University/Research Institution]}}, \orgaddress{\city{\textbf{[TODO: City]}}, \country{\textbf{[TODO: Country]}}}}
 
 \abstract{
 Class imbalance remains a pervasive challenge in tabular machine learning, causing standard empirical risk minimization algorithms to exhibit severe majority-class bias. For over two decades, the Synthetic Minority Over-sampling Technique (SMOTE) and its heuristic variants have served as the standard remediation paradigm. However, SMOTE is vulnerable to the \emph{linear chord problem}, wherein linear interpolation between minority instances cuts across non-linear decision boundaries, generating synthetic samples in majority-class territory and increasing false-positive errors that degrade precision and specificity. In this paper, we conduct an empirical investigation of a retrieval-guided synthetic oversampling framework for tabular data. The framework couples parameter-free Natural Neighbors (NaN) equilibrium discovery with hybrid geometric and dense Sentence-BERT semantic retrieval, feeding retrieved local exemplars into a prompt-based synthesis pipeline with multi-stage quality control. We evaluate this architecture across 42 binary benchmark datasets from the OpenML Table 9 imbalanced suite across three downstream classifier families (Random Forest, Histogram Gradient Boosted Trees, and Logistic Regression), under both unconstrained and volume-matched generation budgets ($N_{\text{syn}} = 30$). Our findings reveal three primary outcomes: (i) on downstream F1-score, the retrieval-guided approach performs comparably to established SMOTE variants (macro F1 of $0.6254$ vs. $0.6617$ for SMOTE on Random Forest); (ii) the framework exhibits a precision- and specificity-oriented operating profile ($0.6959$ precision and $0.9417$ specificity), which is strongly associated with adding fewer synthetic rows than unconstrained heuristic oversamplers; and (iii) a systematic component audit and seed-variance benchmark across 10 datasets and 5 random seeds (200 experimental evaluations) demonstrates that observed differences between prompt conditions are on par with or smaller than seed-to-seed variance ($\pm 0.0242$ F1 within-dataset standard deviation), with component differences heavily confounded by synthetic row volume and linear SMOTE-style top-up interpolation. Based on these findings, we formulate methodological recommendations for controlled evaluation of generative oversampling in tabular machine learning.
@@ -786,7 +838,7 @@ To support scientific verification and exact reproducibility:
 
 \textbf{Funding:} \textbf{[TODO: Funding information or ``This research received no specific grant from any funding agency in the public, commercial, or not-for-profit sectors.'']}
 
-\textbf{Conflict of Interest:} The author declares that there are no financial or commercial conflicts of interest related to this work.
+\textbf{Conflict of Interest:} The authors declare that there are no financial or commercial conflicts of interest related to this work.
 
 \textbf{Ethics Approval:} Not applicable. All experiments were conducted on publicly available, anonymized benchmark datasets.
 
@@ -796,7 +848,7 @@ To support scientific verification and exact reproducibility:
 
 \textbf{Data and Code Availability:} The complete source code, benchmark datasets, and evaluation harnesses supporting the findings of this study are available at \url{https://github.com/samhithareddymadhireddy/RAG_Tab.git} on branch \texttt{audit/rag-tab-publication-readiness}.
 
-\textbf{Author Contributions:} \textbf{[TODO: Specify author contributions (e.g., S.R.M. conceived the project, implemented the pipeline, conducted experiments, analyzed data, and wrote the manuscript).]}
+\textbf{Author Contributions:} \textbf{[TODO: authors to confirm contributions]}
 
 \end{backmatter}
 

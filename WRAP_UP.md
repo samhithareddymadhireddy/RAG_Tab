@@ -48,10 +48,18 @@ Every quantitative metric reported in `main_v2.tex` corresponds directly to empi
 ## 2. Incomplete Items & TODO Markers in `main_v2.tex`
 
 All unverified or author-dependent metadata in `main_v2.tex` are explicitly marked with `\textbf{[TODO: ...]}`:
-1. `\email{\textbf{[TODO: author.email@institution.edu]}}`
-2. `\affil*[1]{\orgdiv{\textbf{[TODO: Department/Division of Computer Science]}}, \orgname{\textbf{[TODO: University/Research Institution]}}, \orgaddress{\city{\textbf{[TODO: City]}}, \country{\textbf{[TODO: Country]}}}}`
-3. `\textbf{Funding:} \textbf{[TODO: Funding information or "This research received no specific grant from any funding agency in the public, commercial, or not-for-profit sectors."]}`
-4. `\textbf{Author Contributions:} \textbf{[TODO: Specify author contributions (e.g., S.R.M. conceived the project, implemented the pipeline, conducted experiments, analyzed data, and wrote the manuscript).]}`
+1. **Author 1 (Corresponding):** Samhitha Reddy Madhireddy:
+   - `\email{\textbf{[TODO: author.email@institution.edu]}}`
+   - `\affil*[1]{\orgdiv{\textbf{[TODO: Department/Division of Computer Science]}}, \orgname{\textbf{[TODO: University/Research Institution]}}, \orgaddress{\city{\textbf{[TODO: City]}}, \country{\textbf{[TODO: Country]}}}}`
+2. **Author 2:** Archana Deshmukh:
+   - `\email{\textbf{[TODO: author2.email@institution.edu]}}`
+   - `\affil[2]{\orgdiv{\textbf{[TODO: Department/Division of Computer Science]}}, \orgname{\textbf{[TODO: University/Research Institution]}}, \orgaddress{\city{\textbf{[TODO: City]}}, \country{\textbf{[TODO: Country]}}}}`
+3. **Author 3:** Dhwani:
+   - `\sur{\textbf{[TODO: Surname]}}`
+   - `\email{\textbf{[TODO: author3.email@institution.edu]}}`
+   - `\affil[3]{\orgdiv{\textbf{[TODO: Department/Division of Computer Science]}}, \orgname{\textbf{[TODO: University/Research Institution]}}, \orgaddress{\city{\textbf{[TODO: City]}}, \country{\textbf{[TODO: Country]}}}}`
+4. **Funding:** `\textbf{[TODO: Funding information or "This research received no specific grant from any funding agency in the public, commercial, or not-for-profit sectors."]}`
+5. **Author Contributions:** `\textbf{[TODO: authors to confirm contributions]}`
 
 ---
 
